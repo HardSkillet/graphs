@@ -1,398 +1,522 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 
 namespace graphs
 {
+    public class point
+    {
+        public bool visited;
+        public int deep;
+    }
     class Program
     {
+        static StringBuilder text = new StringBuilder();
+
         static Dictionary<int, List<int>> graph = new Dictionary<int, List<int>>();
-        static Dictionary<int, bool> visited = new Dictionary<int, bool>();
+
         static List<List<int>> components = new List<List<int>>();
+
+
+        static List<int> list = new List<int>();
+        static Queue<int> queue = new Queue<int>();
         static Regex regex = new Regex(@"\d*\d");
+        static int[,] matrix = new int[500, 500];
+        static List<int> eccentricitiesAnswer = new List<int>();
+        static List<bool> unvisited = new List<bool>();
+        static Dictionary<int, int> func = new Dictionary<int, int>();
         const string path = "graph.txt";
+        static List<int> randomDelete = new List<int>();
+        static List<int> largeDelete = new List<int>();
+        static Dictionary<int, int> dict = new Dictionary<int, int>();
+        
 
 
-        static int findNotVisited() {
-            foreach (var temp in visited) {
-                if (temp.Value == false)
+        static void find(int current, int numberOfMax, Queue<int> vertex, Dictionary<int, bool> dict, Dictionary<int, point> ty)
+        {
+            var count = vertex.Count;
+            Dictionary<int, point> unvisited = new Dictionary<int, point>(ty);
+            var queue = new Queue<int>();
+            queue.Enqueue(current);
+            while (queue.Count > 0 && count > 0)
+            {
+                var temp = queue.Dequeue();
+                foreach (var i in graph[temp])
                 {
-                    return temp.Key;
+                    if (unvisited[i].visited)
+                    {
+                        unvisited[i].deep = unvisited[temp].deep + 1;
+                        unvisited[i].visited = false;
+                        queue.Enqueue(i);
+                        if (dict[i])
+                        {
+                            count--;
+                        }
+                    }
+
                 }
             }
-            return -1;
+            foreach (var a in vertex)
+            {
+                matrix[func[current], func[a]] = unvisited[a].deep;
+                matrix[func[a], func[current]] = unvisited[a].deep;
+            }
         }
 
 
-        static void connectedComponents() {
-            int current = 0;                                                    //Текущая вершина
-            foreach (var j in graph)
+        static List<int> randomNumberGeneration(int numberOfmax)
+        {
+
+            var max = components[numberOfmax].Count;
+            var rnd = new Random();
+            int n = max - 1;
+            var numbers = new List<int>();
+            int temp = rnd.Next(0, n);
+
+            for (int i = 0; i < 500; i++)
             {
-                current = j.Key;
-                visited[j.Key] = false;
-            }                                                                  //Заполняем массив непосещённых вершин
-            int n = visited.Count;
-            var vector = new Stack<int>();                                      //Массив обхода вершин                                       
-            vector.Push(current);
-            var temp = new List<int>();
-            while (n > 0) {
-                if (vector.Count != 0)                                        
+                while (numbers.Contains(temp))
                 {
-                    current = vector.Pop();
-                } else {
-                    current = findNotVisited();
-                    components.Add(temp);
-                    temp = new List<int>();
+                    temp = rnd.Next(0, n);
                 }
-                temp.Add(current);
-                visited[current] = true;
-                n--;
-                foreach (var i in graph[current]) {
-                    if (!visited[i] && !vector.Contains(i)) {
-                        vector.Push(i);
+                numbers.Add(temp);
+            }
+            for (int i = 0; i < 500; i++)
+            {
+                numbers[i] = components[numberOfmax][numbers[i]];
+            }
+            return numbers;
+        }
+
+        static void connectedComponents()
+        {
+            Dictionary<int, bool> unvisited = new Dictionary<int, bool>();
+            var all = new List<int>();
+            int start;
+            foreach (var i in graph)
+            {
+                unvisited.Add(i.Key, true);
+                all.Add(i.Key);
+            }
+            var stack = new Stack<int>();
+            var temp = new List<int>();
+            while (all.Count > 0)
+            {
+                start = all[0];
+                unvisited[start] = false;
+                temp = new List<int>();
+                temp.Add(start);
+                stack.Push(start);
+
+                while (stack.Count > 0)
+                {
+                    int v = stack.Pop();
+                    foreach (var a in graph[v])
+                    {
+                        if (unvisited[a])
+                        {
+                            unvisited[a] = false;
+                            stack.Push(a);
+                            temp.Add(a);
+                        }
                     }
                 }
+                components.Add(temp);
+                all = all.Except(temp).ToList();
             }
-            components.Add(temp);
         }
 
 
-        static void readData(string path) {
+        static void readData(string path)
+        {
             foreach (string line in File.ReadLines(path))
             {
                 parse(line);
             }
         }
-        
-        
-        static void parse(string text) {
-            MatchCollection matches = regex.Matches(text);
+        static void parse(string text1)
+        {
+            MatchCollection matches = regex.Matches(text1);
             if (matches.Count > 0)
             {
                 int a = Int32.Parse(matches[0].Value);
                 int b = Int32.Parse(matches[1].Value);
                 add(a, b);
                 add(b, a);
+                
             }
         }
-        
-        
         static void add(int a, int b)
         {
-            if (graph.ContainsKey(a)) {
+
+            if (graph.ContainsKey(a))
+            {
                 if (!graph[a].Contains(b)) { graph[a].Add(b); }
-            } else {
+            }
+            else
+            {
                 var temp = new List<int>();
                 temp.Add(b);
                 graph.Add(a, temp);
             }
         }
-        static int min(int a, int b)
+
+
+
+        static long numberOfTriangles()
         {
-            if (a < b)
+
+            var marked_a = new Dictionary<int, bool>();
+            foreach (var a in graph)
             {
-                return a;
+                marked_a.Add(a.Key, false);
             }
-            return b;
+
+            long triangles = 0;
+
+            foreach (var a in graph)
+            {
+                var marked_b = new Dictionary<int, bool>();
+                foreach (var c in graph[a.Key])
+                {
+                    marked_b.Add(c, false);
+                }
+                marked_b.Add(a.Key, true);
+                foreach (var b in graph[a.Key])
+                {
+                    if (!marked_a[b])
+                    {
+                        foreach (var c in graph[b])
+                        {
+                            if (!marked_a[c] && marked_b.ContainsKey(c) && !marked_b[c]) { triangles++; }
+                        }
+                        marked_b[b] = true;
+                    }
+                }
+                marked_a[a.Key] = true;
+            }
+            return triangles;
         }
-        static int max(int a, int b)
+
+
+
+        static void matrixConstruction(int numberOfMax)
         {
-            if (a > b)
+            Dictionary<int, point> unvisited = new Dictionary<int, point>();
+            foreach (var i in components[numberOfMax])
             {
-                return a;
+                var temp = new point();
+                temp.visited = true;
+                temp.deep = 0;
+                unvisited.Add(i, temp);
             }
-            return b;
-        }
-        static int Check(bool[] visited, int n) {
-            var f = -1;
-            for (int i = 0; i < n; i++) {
-                if (!visited[i]) {
-                    f = i;
-                    break; }
+            var max = components[numberOfMax].Count;
+            func = new Dictionary<int, int>();
+            list = randomNumberGeneration(numberOfMax);
+            var dict = new Dictionary<int, bool>();
+            foreach (var a in graph)
+            {
+                dict.Add(a.Key, false);
             }
-            return f;
+            foreach (var a in list)
+            {
+                dict[a] = true;
+            }
+            for (int i = 0; i < 500; i++)
+            {
+                func.Add(list[i], i);
+                queue.Enqueue(list[i]);
+            }
+            for (int i = 0; i < 499; i++)
+            {
+                var j = queue.Dequeue();
+                dict[j] = false;
+                find(j, numberOfMax, queue, dict, unvisited);
+            }
+
         }
+        static void deleteX(int x)
+        {
+            var list = new Dictionary<int, int>();
+            int step = (int)((double)graph.Count * x / 100);
+            var unvisited = new Dictionary<int, bool>();
+            int j = 0;
+
+            foreach (var a in graph)
+            {
+                list.Add(j, a.Key);
+                j++;
+                unvisited.Add(a.Key, true);
+            }
+
+            Random rnd = new Random();
+            int n = list.Count - 1;
+            for (int i = 0; i < step; i++)
+            {
+                var temp = list[rnd.Next(0, n)];
+                while (!unvisited[temp])
+                {
+                    temp = list[rnd.Next(0, n)];
+                }
+                unvisited[temp] = false;
+            }
+            randomDelete.Add(connectedComponents(unvisited));
+        }
+
+        static int connectedComponents(Dictionary<int, bool> un)
+        {
+            Dictionary<int, bool> unvisited = new Dictionary<int, bool>(un);
+            var all = new List<int>();
+            int start;
+            int max = 0;
+            foreach (var i in graph)
+            {
+                if (unvisited[i.Key])
+                {
+                    all.Add(i.Key);
+                }
+            }
+            var stack = new Stack<int>();
+            var temp = new List<int>();
+            int j = 0;
+            while (all.Count > j)
+            {
+                while (j < all.Count && !unvisited[all[j]]) { j++; }
+                if (j >= all.Count) {
+                    return max;
+                }
+                start = all[j];
+                unvisited[start] = false;
+                temp = new List<int>();
+                temp.Add(start);
+                stack.Push(start);
+
+                while (stack.Count > 0)
+                {
+                    int v = stack.Pop();
+                    foreach (var a in graph[v])
+                    {
+                        if (unvisited[a])
+                        {
+                            unvisited[a] = false;
+                            stack.Push(a);
+
+                            temp.Add(a);
+
+                        }
+                    }
+                }
+                if (max < temp.Count)
+                {
+                    max = temp.Count;
+
+                }
+                if (max * 2 > all.Count)
+                {
+                    return max;
+                }
+            }
+            return max;
+        }
+        static void deleteLargeX()
+        {
+            var sortedDict = from entry in dict orderby entry.Key descending select entry;
+            for (int i = 1; i <= 99; i++) {
+                var unvisited = new Dictionary<int, bool>();
+                foreach (var a in graph)
+                { 
+                    unvisited.Add(a.Key, true);
+                }
+                int step = (int)((double)graph.Count * i / 100);
+                int temp = 0;
+                foreach (var a in sortedDict) {
+                    temp += a.Key;
+                    if (temp >= step) {
+                        temp = a.Value;
+                        break;
+                    }
+                }
+                foreach (var a in graph) {
+                    if (a.Value.Count >= temp) {
+                        unvisited[a.Key] = false;
+                        step--;
+                    }
+                    if (step == 0) {
+                        break;
+                    }
+                }
+                largeDelete.Add(connectedComponents(unvisited));
+                Console.WriteLine(i);
+            }
+
+        }
+
 
         static void Main(string[] args)
         {
-            Stopwatch stopWatch = new Stopwatch();
-            stopWatch.Start();
+
             readData(path);
-            stopWatch.Stop();
-            TimeSpan ts = stopWatch.Elapsed;
-            string elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}",
-            ts.Hours, ts.Minutes, ts.Seconds,
-            ts.Milliseconds / 10);
-            Console.WriteLine(elapsedTime + " read data");
 
-
-            stopWatch.Reset();
-            stopWatch.Start();
             int vertex = graph.Count;
             int edge = 0;
-            foreach (var temp in graph) {
+            int max1 = 0;
+            int min1 = 9999999;
+            int sum1 = 0;
+            foreach (var temp in graph)
+            {
+                if (temp.Value.Count > max1) {
+                    max1 = temp.Value.Count;
+                }
+                if (temp.Value.Count < min1) {
+                    min1 = temp.Value.Count;
+                }
+                sum1 += temp.Value.Count;
                 edge += temp.Value.Count;
             }
             edge /= 2;
+            double r = (double)sum1 / vertex;
+
+
             double p = 2 * edge / ((double)vertex * (vertex - 1));
-            stopWatch.Stop();
-            elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}",
-            ts.Hours, ts.Minutes, ts.Seconds,
-            ts.Milliseconds / 10);
-            ts = stopWatch.Elapsed;
-            Console.WriteLine(elapsedTime + " rebra vershins");
-            Console.WriteLine(vertex + " " + edge + " " + edge/2 + " " + p);
+
+
+            Console.WriteLine(vertex + " - Число вершин в графе");
+            Console.WriteLine(edge + " - Число рёбер в графе");
+            Console.WriteLine(p + " - Плотность в графе");
 
 
 
-
-
-            stopWatch.Reset();
-            stopWatch.Start();
             connectedComponents();
-            int a = 0;
-            foreach (var temp in components) {
-                a += temp.Count;
-            }
-            Console.WriteLine(vertex + " " + a);
-            stopWatch.Stop();
-            ts = stopWatch.Elapsed;
-            elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}",
-            ts.Hours, ts.Minutes, ts.Seconds,
-            ts.Milliseconds / 10);
-            Console.WriteLine(elapsedTime + " components");
 
-            /*
-            var e = new Dictionary<int, int>();
-            var v = new List<int>();
-            var vd = new Dictionary<int, int>();
-
-            string text;
-            using (StreamReader reader = new StreamReader(path))
-            {
-                text = reader.ReadToEnd();
-            }
-            MatchCollection matches = regex.Matches(text);
-            if (matches.Count > 0)
-            {
-                int temp = 0;
-                int s = 0;
-                foreach (Match match in matches)
-                {
-                    temp = Int32.Parse(match.Value);
-                    if (!v.Contains(temp))
-                    {
-                        v.Add(temp);
-                        vd.Add(temp, s++);
-                    }
-                }
-            }
-            int n = v.Count;
-            Console.WriteLine(n + " Число вершин");
-
-
-            bool[,] matrix = new bool[n, n];
-            for (int i = 0; i < n; i++) {
-                for (int j = 0; j < n; j++) {
-                    matrix[i, j] = false;
-                }
-            }
-            bool f = true;
-            int temp1 = 0;
-            int temp2 = 0;
-            int t = 0;
-            foreach (Match match in matches)
-            {
-                if (f)
-                {
-                    temp1 = Int32.Parse(match.Value);
-                    f = !f;
-                } else
-                {
-                    temp2 = Int32.Parse(match.Value);
-                    f = !f;
-                }
-                if (f) {
-                    matrix[vd[temp1], vd[temp2]] = true;
-                    matrix[vd[temp2], vd[temp1]] = true;
-                    t += 1;
-                }
-            }
-            Console.WriteLine(t + " Число рёбер");
-            Console.WriteLine((double)(2*t)/(n*(n-1)) + " Плотность");
-            var visited = new bool[n];
-            for (int i = 0; i < n; i++) {
-                visited[i] = false;
-            }
-            int k = 0;
             int max = 0;
-            int contains = -1;
-            while (Check(visited, n) != -1) {
-                k++;
-                int start = Check(visited, n);
-                var ver = new List<int>();
-                ver.Add(start);
-                int r = 1;
-                while (ver.Count != 0) {
-                    int current = ver[0];
-                    visited[current] = true;
-                    for (int i = 0; i < n; i++)
-                    {
-                        if (matrix[current, i]) {
-                            if (!visited[i] && !ver.Contains(i)) {
-                                ver.Add(i);
-                                r++;
-                            }
-                        }
-                    }
-                    ver.Remove(current);
-                }
-                if (r > max) {
-                    max = r;
-                    contains = start;
-                }
-            }
-            Console.WriteLine(k + " Число компонент связности\n" + max + " Количество вершин в наибольшей компоненте");
+            int numberOfmax = 0;
+            for (int i = 0; i < components.Count; i++)
+            {
 
-            /*
-            var ver1 = new List<int>();
-            ver1.Add(contains);
-            var vK = new List<int>();
-            for (int i = 0; i < n; i++)
-            {
-                visited[i] = false;
-            }
-            t = 0;
-            var vdK = new Dictionary<int, int>();
-            while (ver1.Count != 0)
-            {
-                int current = ver1[0];
-                visited[current] = true;
-                vK.Add(v[current]);
-                vdK.Add(v[current], t++);
-                for (int i = 0; i < n; i++)
+                if (components[i].Count > max)
                 {
-                    if (matrix[current, i])
-                    {
-                        if (!visited[i] && !ver1.Contains(i))
-                        {
-                            ver1.Add(i);
-                        }
-                    }
+                    max = components[i].Count;
+                    numberOfmax = i;
                 }
-                ver1.Remove(current);
             }
 
-            int[,] matrix1 = new int[max, max];
-            for (int i = 0; i < max; i++)
-            {
-                for (int j = 0; j < max; j++)
-                {
-                    matrix1[i, j] = 999999999;
-                }
-            }
-            f = true;
-            temp1 = 0;
-            temp2 = 0;
-            foreach (Match match in matches)
-            {
-                if (f)
-                {
-                    temp1 = Int32.Parse(match.Value);
-                    f = !f;
-                }
-                else
-                {
-                    temp2 = Int32.Parse(match.Value);
-                    f = !f;
-                }
-                if (f)
-                {
-                    if (vK.Contains(temp1))
-                    {
-                        matrix1[vdK[temp1], vdK[temp2]] = 1;
-                        matrix1[vdK[temp2], vdK[temp1]] = 1;
-                    }
-                }
-            }
-            Console.WriteLine(1);
-            var E = new int[max];
-            for (int i = 0; i < max; i++) {
-                E[i] = 0;
-            }
-            for (int z = 0; z < max; z++)
-            {
-                for (int j = 0; j < max; j++)
-                {
-                    for (int i = 0; i < max; i++)
-                    {
-                        matrix1[i, j] = min(matrix1[i, j], matrix1[i, z] + matrix1[z, j]);
-                    }
-                }
-                Console.WriteLine(z);
-            }
-            Console.WriteLine(2);
-            for (int i = 0; i < max; i++)
-            {
-                for (int j = 0; j < max; j++)
-                {
-                    E[i] = Max(E[i], matrix1[i, j]);
-                }
-            }
-            Console.WriteLine(3);
-            int rad = 999999999;
-            int diam = -1;
-            for (int i = 0; i < n; i++)
-            {
-                rad = min(rad, E[i]);
-                diam = Max(diam, E[i]);
-            }
-            Console.WriteLine(4);
-            Console.WriteLine(rad + " RADIUS\n" + diam + " DIAMETR");
-            */
-            /*
-              var allComp = new Dictionary<int, int>();
-              for (int i = 0; i < n; i++)
-              {
-                  visited[i] = false;
-              }
-              while (Check(visited, n) != -1)
-              {
-                  int start = Check(visited, n);
-                  var ver = new List<int>();
-                  ver.Add(start);
-                  int r = 1;
-                  while (ver.Count != 0)
-                  {
-                      int current = ver[0];
-                      visited[current] = true;
-                      for (int i = 0; i < n; i++)
-                      {
-                          if (matrix[current, i])
-                          {
-                              if (!visited[i] && !ver.Contains(i))
-                              {
-                                  ver.Add(i);
-                                  r++;
-                              }
-                          }
-                      }
-                      ver.Remove(current);
-                  }
 
-                      allComp.Add(start, r);
-              }
-              t = 0;
-              foreach (var a in allComp) {
-                  if (a.Value == 3) {
-                      t++;
-                  }
-                  Console.WriteLine(a.Key + " " + a.Value);
-              }
-              Console.WriteLine(t);*/
+            Console.WriteLine(components.Count + " - Число компоннет слабой связности");
+            Console.WriteLine((double)max / vertex * 100 + " - Доля вершин в максимальной по мощности компоненте");
+
+
+            foreach (var a in largeDelete)
+            {
+                Console.WriteLine((double)a * 100 / vertex);
+            }
+
+            matrixConstruction(numberOfmax);
+
+            var eccentricities = new List<int>();
+            for (int i = 0; i < 500; i++)
+            {
+                max = 0;
+                for (int j = 0; j < 500; j++)
+                {
+                    if (matrix[i, j] > max)
+                    {
+                        max = matrix[i, j];
+                    }
+                }
+                eccentricities.Add(max);
+            }
+
+            int diametr = 0;
+            int radius = 9999999;
+            for (int i = 0; i < 500; i++)
+            {
+                if (eccentricities[i] > diametr)
+                {
+                    diametr = eccentricities[i];
+                }
+                if (radius > eccentricities[i])
+                {
+                    radius = eccentricities[i];
+                }
+            }
+
+
+
+            for (int i = 0; i < 500; i++)
+            {
+                if (eccentricities[i] == radius)
+                {
+                    eccentricitiesAnswer.Add(list[i]);
+                }
+            }
+            Console.WriteLine(radius + " - Радиус сети\n" + diametr + " - Диаметр сети");
+            eccentricities.Sort();
+
+            var distance = new List<int>();
+            for (int i = 0; i < 500; i++)
+            {
+                for (int j = i + 1; j < 500; j++)
+                {
+                    distance.Add(matrix[i, j]);
+                }
+            }
+            distance.Sort();
+            Console.WriteLine(distance[(int)((double)500 * (500 - 1) / 2 * 0.9)] + " - 90%");
+
+
+
+
+
+
+            var LCC = new Dictionary<int, double>();
+            double sum = 0;
+            foreach (var temp in graph)
+            {
+
+                int k = temp.Value.Count;
+                if (k < 2)
+                {
+                    LCC.Add(temp.Key, 0);
+                    continue;
+                }
+
+                int e = 0;
+                for (int i = 0; i < temp.Value.Count; i++)
+                {
+                    e += graph[temp.Value[i]].Intersect(temp.Value).ToList().Count;
+                }
+                sum += (double)2 * e / (k * (k - 1));
+                LCC.Add(temp.Key, (double)2 * e / (k * (k - 1)));
+            }
+
+            long triangles = numberOfTriangles();
+
+
+            double arround = 0;
+            foreach (var a in LCC)
+            {
+                arround += a.Value;
+            }
+            arround /= vertex;
+
+            double global = 0;
+            double sumTemp = 0;
+            foreach (var i in graph)
+            {
+                global += graph[i.Key].Count * graph[i.Key].Count * LCC[i.Key];
+                sumTemp += graph[i.Key].Count * graph[i.Key].Count;
+            }
+            global /= sumTemp;
+
+            Console.WriteLine(triangles + " - Число треугольников");
+            Console.WriteLine(arround + " - Средний кластерный коэфициент\n " + global + " - Глобальный кластерный коэфициент");
+
+            
+
         }
     }
 }
