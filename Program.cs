@@ -1,13 +1,154 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 
 namespace graphs
 {
+    public class intEnum : IEnumerator
+    {
+        public int[] array;
+        public int count;
+
+        int position = -1;
+
+        public intEnum(int[] list, int c)
+        {
+            array = list;
+            count = c;
+        }
+
+        public bool MoveNext()
+        {
+            position++;
+            return (position < count);
+        }
+
+        public void Reset()
+        {
+            position = -1;
+        }
+
+        object IEnumerator.Current
+        {
+            get
+            {
+                return Current;
+            }
+        }
+
+        public int Current
+        {
+            get
+            {
+                try
+                {
+                    return array[position];
+                }
+                catch (IndexOutOfRangeException)
+                {
+                    throw new InvalidOperationException();
+                }
+            }
+        }
+    }
+    public class Set : IEnumerable
+    {
+        private int capacity = 5;
+        private int count = 0;
+        public int[] array = new int[5];
+        public int Count { get { return count; } }
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return (IEnumerator)GetEnumerator();
+        }
+
+        public intEnum GetEnumerator()
+        {
+            return new intEnum(array, count);
+        }
+        public void Add(int n) {
+            if (count < capacity)
+            {
+                array[count] = n;
+                count++;
+            }
+            else {
+                capacity *= 2;
+                int[] temp = new int[capacity];
+                for (int i = 0; i < count; i++) {
+                    temp[i] = array[i];
+                }
+                array = temp;
+                array[count] = n;
+                count++;
+            }
+        }
+        public bool Contains(int n) {
+            int left = 0;
+            int right = count - 1;
+            if (array[0] > n) {
+                return false;
+            }
+            if (array[count - 1] < n) {
+                return false;
+            }
+            while (left + 1 != right) {
+                int current = (left + right) / 2;
+                if (array[current] == n) {
+                    return true;
+                }
+                if (array[current] > n)
+                {
+                    right = current;
+                }
+                else {
+                    left = current;
+                }
+            }
+            if (array[left] != n && array[right] != n)
+            {
+                return false;
+            }
+            else return true;
+            
+        }
+
+        public void QuickSort(int first, int last)
+        {
+            int i = first, j = last, x = array[(first + last) / 2];
+            do
+            {
+                while (array[i] < x) i++;
+                while (array[j] > x) j--;
+
+                if (i <= j)
+                {
+                    if (array[i] > array[j])
+                    {
+                        var a = array[i];
+                        array[i] = array[j];
+                        array[j] = a;
+                    }
+                    i++;
+                    j--;
+                }
+            } while (i <= j);
+            if (i < last)
+            {
+                QuickSort(i, last);
+            }
+            if (first < j)
+            {
+                QuickSort(first, j);
+            }
+        }
+    }
     public class point
     {
         public bool visited;
@@ -17,7 +158,7 @@ namespace graphs
     {
         static StringBuilder text = new StringBuilder();
 
-        static Dictionary<int, List<int>> graph = new Dictionary<int, List<int>>();
+        static Dictionary<int, Set> graph = new Dictionary<int, Set>();
 
         static List<List<int>> components = new List<List<int>>();
 
@@ -29,7 +170,7 @@ namespace graphs
         static List<int> eccentricitiesAnswer = new List<int>();
         static List<bool> unvisited = new List<bool>();
         static Dictionary<int, int> func = new Dictionary<int, int>();
-        const string path = "graph.txt";
+        const string path = "Astro.txt";
         static List<int> randomDelete = new List<int>();
         static List<int> largeDelete = new List<int>();
         static Dictionary<int, int> dict = new Dictionary<int, int>();
@@ -145,8 +286,11 @@ namespace graphs
             {
                 int a = Int32.Parse(matches[0].Value);
                 int b = Int32.Parse(matches[1].Value);
-                add(a, b);
-                add(b, a);
+                if (a != b)
+                {
+                    add(a, b);
+                    add(b, a);
+                }
                 
             }
         }
@@ -155,11 +299,11 @@ namespace graphs
 
             if (graph.ContainsKey(a))
             {
-                if (!graph[a].Contains(b)) { graph[a].Add(b); }
+                if (!graph[a].Contains(b)) { graph[a].Add(b); graph[a].QuickSort(0, graph[a].Count-1); }
             }
             else
             {
-                var temp = new List<int>();
+                var temp = new Set();
                 temp.Add(b);
                 graph.Add(a, temp);
             }
@@ -306,7 +450,6 @@ namespace graphs
                             stack.Push(a);
 
                             temp.Add(a);
-
                         }
                     }
                 }
@@ -350,7 +493,6 @@ namespace graphs
                     }
                 }
                 largeDelete.Add(connectedComponents(unvisited));
-                Console.WriteLine(i);
             }
 
         }
@@ -358,7 +500,10 @@ namespace graphs
 
         static void Main(string[] args)
         {
+            Stopwatch stopWatch = new Stopwatch();
+            stopWatch.Start();
 
+            
             readData(path);
 
             int vertex = graph.Count;
@@ -388,7 +533,17 @@ namespace graphs
             Console.WriteLine(edge + " - Число рёбер в графе");
             Console.WriteLine(p + " - Плотность в графе");
 
+            stopWatch.Stop();
 
+            TimeSpan ts = stopWatch.Elapsed;
+
+
+            string elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}",
+                ts.Hours, ts.Minutes, ts.Seconds,
+                ts.Milliseconds / 10);
+            Console.WriteLine("RunTime " + elapsedTime);
+            stopWatch = new Stopwatch();
+            stopWatch.Start();
 
             connectedComponents();
 
@@ -403,11 +558,24 @@ namespace graphs
                     numberOfmax = i;
                 }
             }
+            randomDelete.Add(max);
+            largeDelete.Add(max);
 
 
             Console.WriteLine(components.Count + " - Число компоннет слабой связности");
             Console.WriteLine((double)max / vertex * 100 + " - Доля вершин в максимальной по мощности компоненте");
 
+            stopWatch.Stop();
+
+            ts = stopWatch.Elapsed;
+
+
+            elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}",
+                ts.Hours, ts.Minutes, ts.Seconds,
+                ts.Milliseconds / 10);
+            Console.WriteLine("RunTime " + elapsedTime);
+            stopWatch = new Stopwatch();
+            stopWatch.Start();
 
             foreach (var a in largeDelete)
             {
@@ -466,7 +634,17 @@ namespace graphs
             }
             distance.Sort();
             Console.WriteLine(distance[(int)((double)500 * (500 - 1) / 2 * 0.9)] + " - 90%");
+            stopWatch.Stop();
 
+            ts = stopWatch.Elapsed;
+
+
+            elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}",
+                ts.Hours, ts.Minutes, ts.Seconds,
+                ts.Milliseconds / 10);
+            Console.WriteLine("RunTime " + elapsedTime);
+            stopWatch = new Stopwatch();
+            stopWatch.Start();
 
 
 
@@ -476,8 +654,8 @@ namespace graphs
             double sum = 0;
             foreach (var temp in graph)
             {
-
-                int k = temp.Value.Count;
+                var neighbors = temp.Value;
+                int k = neighbors.Count;
                 if (k < 2)
                 {
                     LCC.Add(temp.Key, 0);
@@ -485,9 +663,17 @@ namespace graphs
                 }
 
                 int e = 0;
-                for (int i = 0; i < temp.Value.Count; i++)
+                for (int i = 0; i < k; i++)
                 {
-                    e += graph[temp.Value[i]].Intersect(temp.Value).ToList().Count;
+                    int j = 0;
+                    int z = 0;
+                    var current = graph[temp.Value.array[i]];
+                    while (j < neighbors.Count && z < current.Count) {
+                        if (neighbors.array[j] == current.array[z]) {
+                            e++;
+                        }
+                        if (neighbors.array[j] < current.array[z]) { j++; } else { z++; }
+                    }
                 }
                 sum += (double)2 * e / (k * (k - 1));
                 LCC.Add(temp.Key, (double)2 * e / (k * (k - 1)));
@@ -513,10 +699,35 @@ namespace graphs
             global /= sumTemp;
 
             Console.WriteLine(triangles + " - Число треугольников");
-            Console.WriteLine(arround + " - Средний кластерный коэфициент\n " + global + " - Глобальный кластерный коэфициент");
+            Console.WriteLine(arround + " - Средний кластерный коэфициент\n" + global + " - Глобальный кластерный коэфициент");
+            stopWatch.Stop();
 
-            
+            ts = stopWatch.Elapsed;
 
+
+            elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}",
+                ts.Hours, ts.Minutes, ts.Seconds,
+                ts.Milliseconds / 10);
+            Console.WriteLine("RunTime " + elapsedTime);
+            stopWatch = new Stopwatch();
+            stopWatch.Start();
+
+            for (int i = 1; i < 100; i++) {
+                deleteX(i);
+            }
+            deleteLargeX();
+            Console.WriteLine("Удаление вершин и поиcк компоненты завершены!");
+
+
+            stopWatch.Stop();
+
+            ts = stopWatch.Elapsed;
+
+
+            elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}",
+                ts.Hours, ts.Minutes, ts.Seconds,
+                ts.Milliseconds / 10);
+            Console.WriteLine("RunTime " + elapsedTime);
         }
     }
 }
